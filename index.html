@@ -297,13 +297,12 @@ const CONFIG = {
   tenantId:    'e12fde86-a03f-4577-96b1-e8c0134600d2',
   environment: 'ifb-Test',      // ← change to 'Production' for prod
   company:     'IFB',            // ← change if company name differs
-  // The real, canonical URL of THIS file on SharePoint. Must be updated
-  // here if the file is ever moved or renamed. SharePoint's preview
-  // viewer loads this file via an iframe srcdoc attribute rather than a
-  // real src URL, so window.location.href inside that viewer returns
-  // the meaningless "about:srcdoc" and cannot be used to build a working
-  // escape-to-new-tab link — this hardcoded URL is the workaround.
-  canonicalUrl: 'https://betriebsrat4.sharepoint.com/sites/DMSSandbox/de-DE/Business%20Central%20Daten%20APIs/warenentnahme-test.html?web=1',
+  // The real, canonical URL of THIS file when hosted on GitHub Pages.
+  // Must be updated here if the file is ever moved or renamed. This is
+  // only used as a fallback escape link if the page is ever loaded
+  // inside an iframe (which should not happen on GitHub Pages, unlike
+  // the previous SharePoint hosting attempt).
+  canonicalUrl: 'https://andreareichert77.github.io/warenentnahme-test/',
 };
 // ─── derived (do not touch) ───────────────────────
 CONFIG.bcBase = `https://api.businesscentral.dynamics.com/v2.0/${CONFIG.tenantId}/${CONFIG.environment}/api`;
