@@ -846,7 +846,7 @@ async function submitRequest() {
     // 1. Create header
     const header = await bcPost(
       `/ifb/withdrawal/v1.0/withdrawalRequests${companyParam()}`,
-      { vendorNo, remark }
+      { employeeNo: vendorNo, remark }
     );
 
     // 2. Create lines
@@ -883,7 +883,7 @@ async function loadMyRequests() {
 
   try {
     let url = `/ifb/withdrawal/v1.0/withdrawalRequests${companyParam()}&$orderby=requestDate desc&$top=20`;
-    if (vendorNo) url += `&$filter=vendorNo eq '${encodeURIComponent(vendorNo)}'`;
+    if (vendorNo) url += `&$filter=employeeNo eq '${encodeURIComponent(vendorNo)}'`;
 
     const data = await bcGet(url);
     const rows = data.value || [];
@@ -905,7 +905,7 @@ async function loadMyRequests() {
             <tr>
               <td><strong>${esc(r.no)}</strong></td>
               <td>${r.requestDate ? r.requestDate.substring(0,10) : '–'}</td>
-              <td>${esc(r.vendorName || r.vendorNo)}</td>
+              <td>${esc(r.employeeName || r.employeeNo)}</td>
               <td><span style="color:${statusColor[r.status] || '#333'};font-weight:600">${esc(r.status)}</span></td>
               <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.remark || '')}</td>
               <td>${esc(r.processedBy || '–')}</td>
