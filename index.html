@@ -136,48 +136,48 @@ const CONFIG = {
 
     <!-- Step 1: Request details -->
     <div class="card">
-      <div class="card-title">1 · Request Details</div>
+      <div class="card-title">1 · Anforderungsdetails</div>
       <div class="form-row">
         <div class="form-group" style="flex:2">
-          <label>Employee (Vendor)</label>
+          <label>Mitarbeiter (Kreditor)</label>
           <select id="vendorSelect" onchange="onVendorChange()">
-            <option value="">— Loading employees… —</option>
+            <option value="">— Mitarbeiter werden geladen… —</option>
           </select>
         </div>
         <div class="form-group" style="flex:1">
-          <label>Location</label>
+          <label>Lagerort</label>
           <select id="locationSelect">
-            <option value="">— Loading… —</option>
+            <option value="">— Lädt… —</option>
           </select>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Remark (optional)</label>
-          <textarea id="remarkInput" placeholder="Reason for this withdrawal…"></textarea>
+          <label>Bemerkung (optional)</label>
+          <textarea id="remarkInput" placeholder="Grund für diese Warenentnahme…"></textarea>
         </div>
       </div>
     </div>
 
     <!-- Step 2: Add items -->
     <div class="card">
-      <div class="card-title">2 · Add Items</div>
+      <div class="card-title">2 · Artikel hinzufügen</div>
       <div class="form-row" style="align-items:flex-end">
         <div class="form-group" style="flex:3">
-          <label>Search Item</label>
+          <label>Artikel suchen</label>
           <div id="searchWrapper">
-            <input id="itemSearchInput" type="text" placeholder="Type item no. or description…"
+            <input id="itemSearchInput" type="text" placeholder="Artikelnr. oder Beschreibung eingeben…"
                    oninput="onItemSearch()" onkeydown="onSearchKey(event)" autocomplete="off" />
             <div id="searchDropdown"></div>
           </div>
         </div>
         <div class="form-group" style="flex:0 0 100px">
-          <label>Quantity</label>
+          <label>Menge</label>
           <input id="qtyInput" type="number" min="0.001" step="1" value="1" />
         </div>
         <div style="padding-bottom:1px">
           <button class="btn btn-primary" onclick="addToBasket()" id="btnAdd">
-            + Add
+            + Hinzufügen
           </button>
         </div>
       </div>
@@ -185,14 +185,14 @@ const CONFIG = {
 
     <!-- Step 3: Basket -->
     <div class="card">
-      <div class="card-title">3 · Basket <span id="basketCount" style="color:var(--gray-3);font-weight:400;font-size:13px"></span></div>
+      <div class="card-title">3 · Warenkorb <span id="basketCount" style="color:var(--gray-3);font-weight:400;font-size:13px"></span></div>
       <div id="basketContainer">
-        <p class="empty-basket">No items added yet.</p>
+        <p class="empty-basket">Noch keine Artikel hinzugefügt.</p>
       </div>
       <div style="display:flex; justify-content:flex-end; margin-top:16px; gap:10px">
-        <button class="btn btn-ghost" onclick="clearBasket()">Clear basket</button>
+        <button class="btn btn-ghost" onclick="clearBasket()">Warenkorb leeren</button>
         <button class="btn btn-success" id="btnSubmit" onclick="submitRequest()" disabled>
-          ✔ Submit Request
+          ✔ Anfrage absenden
         </button>
       </div>
     </div>
@@ -200,10 +200,10 @@ const CONFIG = {
     <!-- My requests -->
     <div class="card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>My Requests</span>
-        <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="loadMyRequests()">↻ Refresh</button>
+        <span>Meine Anfragen</span>
+        <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="loadMyRequests()">↻ Aktualisieren</button>
       </div>
-      <div id="myRequestsContainer"><p class="empty-basket">Loading…</p></div>
+      <div id="myRequestsContainer"><p class="empty-basket">Bitte zuerst einen Mitarbeiter auswählen, um die zugehörigen Anfragen anzuzeigen.</p></div>
     </div>
 
   </div><!-- /appContent -->
@@ -272,9 +272,9 @@ async function workerPost(path, body) {
 
 // ── Init ─────────────────────────────────────────
 async function initApp() {
-  setLoadStatus('Loading…');
+  setLoadStatus('Lädt…');
   await Promise.all([loadVendors(), loadLocations(), loadItems()]);
-  await loadMyRequests();
+  showNoVendorSelectedHint();
   setLoadStatus('');
 }
 
@@ -284,7 +284,7 @@ async function loadVendors() {
     const data = await workerGet(`/employees`);
     const sel = document.getElementById('vendorSelect');
 
-    sel.innerHTML = '<option value="">— Select employee —</option>';
+    sel.innerHTML = '<option value="">— Mitarbeiter auswählen —</option>';
     (data.value || []).forEach(v => {
       const opt = document.createElement('option');
       opt.value       = v.no;
@@ -292,7 +292,7 @@ async function loadVendors() {
       sel.appendChild(opt);
     });
   } catch (e) {
-    showToast('Could not load employees: ' + e.message, 'error');
+    showToast('Mitarbeiter konnten nicht geladen werden: ' + e.message, 'error');
   }
 }
 
@@ -308,7 +308,7 @@ async function loadLocations() {
       sel.appendChild(opt);
     });
   } catch (e) {
-    showToast('Could not load locations: ' + e.message, 'error');
+    showToast('Lagerorte konnten nicht geladen werden: ' + e.message, 'error');
   }
 }
 
@@ -317,7 +317,7 @@ async function loadItems() {
     const data = await workerGet(`/items`);
     allItems = data.value || [];
   } catch (e) {
-    showToast('Could not load item catalogue: ' + e.message, 'error');
+    showToast('Artikelkatalog konnte nicht geladen werden: ' + e.message, 'error');
   }
 }
 
@@ -336,7 +336,7 @@ function onItemSearch() {
   ).slice(0, 40);
 
   if (filteredItems.length === 0) {
-    dd.innerHTML = '<div class="search-item" style="color:var(--gray-3)">No items found</div>';
+    dd.innerHTML = '<div class="search-item" style="color:var(--gray-3)">Keine Artikel gefunden</div>';
     dd.classList.add('open');
     return;
   }
@@ -389,9 +389,9 @@ document.addEventListener('click', e => {
 
 // ── Basket ────────────────────────────────────────
 function addToBasket() {
-  if (!selectedItem) { showToast('Please select an item first.', 'error'); return; }
+  if (!selectedItem) { showToast('Bitte zuerst einen Artikel auswählen.', 'error'); return; }
   const qty = parseFloat(document.getElementById('qtyInput').value);
-  if (!qty || qty <= 0) { showToast('Please enter a quantity > 0.', 'error'); return; }
+  if (!qty || qty <= 0) { showToast('Bitte eine Menge größer 0 eingeben.', 'error'); return; }
 
   // Merge if same item + location
   const loc = document.getElementById('locationSelect').value;
@@ -438,7 +438,7 @@ function renderBasket() {
   cnt.textContent = basket.length ? `(${basket.length} line${basket.length > 1 ? 's' : ''})` : '';
 
   if (basket.length === 0) {
-    el.innerHTML = '<p class="empty-basket">No items added yet.</p>';
+    el.innerHTML = '<p class="empty-basket">Noch keine Artikel hinzugefügt.</p>';
     btn.disabled = true;
     return;
   }
@@ -449,11 +449,11 @@ function renderBasket() {
     <table class="basket-table">
       <thead>
         <tr>
-          <th>Item No.</th>
-          <th>Description</th>
-          <th>Qty</th>
-          <th>UoM</th>
-          <th>Location</th>
+          <th>Artikelnr.</th>
+          <th>Beschreibung</th>
+          <th>Menge</th>
+          <th>ME</th>
+          <th>Lagerort</th>
           <th></th>
         </tr>
       </thead>
@@ -477,6 +477,17 @@ function renderBasket() {
 
 function onVendorChange() {
   renderBasket();
+  const vendorNo = document.getElementById('vendorSelect').value;
+  if (vendorNo) {
+    loadMyRequests();
+  } else {
+    showNoVendorSelectedHint();
+  }
+}
+
+function showNoVendorSelectedHint() {
+  const el = document.getElementById('myRequestsContainer');
+  el.innerHTML = '<p class="empty-basket">Bitte zuerst einen Mitarbeiter auswählen, um die zugehörigen Anfragen anzuzeigen.</p>';
 }
 
 // ── Submit ────────────────────────────────────────
@@ -484,12 +495,12 @@ async function submitRequest() {
   const vendorNo = document.getElementById('vendorSelect').value;
   const remark   = document.getElementById('remarkInput').value.trim();
 
-  if (!vendorNo) { showToast('Please select an employee.', 'error'); return; }
-  if (basket.length === 0) { showToast('Basket is empty.', 'error'); return; }
+  if (!vendorNo) { showToast('Bitte einen Mitarbeiter auswählen.', 'error'); return; }
+  if (basket.length === 0) { showToast('Der Warenkorb ist leer.', 'error'); return; }
 
   const btn = document.getElementById('btnSubmit');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Submitting…';
+  btn.innerHTML = '<span class="spinner"></span> Wird gesendet…';
 
   try {
     const header = await workerPost('/requests', {
@@ -502,16 +513,16 @@ async function submitRequest() {
       })),
     });
 
-    showToast(`✔ Request ${header.no} submitted successfully!`, 'success');
+    showToast(`✔ Anfrage ${header.no} erfolgreich gesendet!`, 'success');
     clearBasket();
     document.getElementById('remarkInput').value = '';
     await loadMyRequests();
 
   } catch (e) {
-    showToast('Error: ' + e.message, 'error');
+    showToast('Fehler: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '✔ Submit Request';
+    btn.innerHTML = '✔ Anfrage absenden';
     renderBasket();
   }
 }
@@ -519,18 +530,22 @@ async function submitRequest() {
 // ── My Requests ───────────────────────────────────
 async function loadMyRequests() {
   const vendorNo = document.getElementById('vendorSelect').value;
+  if (!vendorNo) {
+    showNoVendorSelectedHint();
+    return;
+  }
+
   const el = document.getElementById('myRequestsContainer');
-  el.innerHTML = '<p class="empty-basket">Loading…</p>';
+  el.innerHTML = '<p class="empty-basket">Lädt…</p>';
 
   try {
-    let url = '/requests';
-    if (vendorNo) url += `?employeeNo=${encodeURIComponent(vendorNo)}`;
+    const url = `/requests?employeeNo=${encodeURIComponent(vendorNo)}`;
 
     const data = await workerGet(url);
     const rows = data.value || [];
 
     if (rows.length === 0) {
-      el.innerHTML = '<p class="empty-basket">No requests found.</p>';
+      el.innerHTML = '<p class="empty-basket">Keine Anfragen gefunden.</p>';
       return;
     }
 
@@ -539,7 +554,7 @@ async function loadMyRequests() {
     el.innerHTML = `
       <table class="basket-table">
         <thead>
-          <tr><th>No.</th><th>Date</th><th>Employee</th><th>Status</th><th>Remark</th><th>Processed By</th></tr>
+          <tr><th>Nr.</th><th>Datum</th><th>Mitarbeiter</th><th>Status</th><th>Bemerkung</th><th>Bearbeitet von</th></tr>
         </thead>
         <tbody>
           ${rows.map(r => `
@@ -555,7 +570,7 @@ async function loadMyRequests() {
         </tbody>
       </table>`;
   } catch (e) {
-    el.innerHTML = `<p class="empty-basket" style="color:var(--warn)">Could not load requests: ${esc(e.message)}</p>`;
+    el.innerHTML = `<p class="empty-basket" style="color:var(--warn)">Anfragen konnten nicht geladen werden: ${esc(e.message)}</p>`;
   }
 }
 
