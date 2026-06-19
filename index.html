@@ -57,16 +57,16 @@
   .btn-danger { background: transparent; color: var(--warn); border: 1px solid var(--warn); padding: 4px 10px; font-size: 13px; }
   .btn-danger:hover:not(:disabled) { background: #fdf0ec; }
 
-  /* ── Item search ──────────────────────────────── */
-  #searchWrapper { position: relative; }
-  #itemSearchInput { width: 100%; }
-  #searchDropdown {
+  /* ── Search dropdowns (items, employees) ──────── */
+  #searchWrapper, #vendorSearchWrapper { position: relative; }
+  #itemSearchInput, #vendorSearchInput { width: 100%; }
+  #searchDropdown, .search-dropdown {
     position: absolute; top: 100%; left: 0; right: 0; background: #fff;
     border: 1px solid var(--gray-2); border-top: none; border-radius: 0 0 6px 6px;
     max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: var(--shadow);
     display: none;
   }
-  #searchDropdown.open { display: block; }
+  #searchDropdown.open, .search-dropdown.open { display: block; }
   .search-item { padding: 9px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--gray-1); }
   .search-item:hover, .search-item.highlighted { background: var(--brand-light); }
   .search-item .item-no { font-weight: 600; color: var(--brand); margin-right: 8px; }
@@ -140,9 +140,11 @@ const CONFIG = {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Mitarbeiter (Kreditor)</label>
-          <select id="vendorSelect" onchange="onVendorChange()">
-            <option value="">— Mitarbeiter werden geladen… —</option>
-          </select>
+          <div id="vendorSearchWrapper" style="position:relative">
+            <input id="vendorSearchInput" type="text" placeholder="Name oder Nummer eingeben…"
+                   oninput="onVendorSearch()" onkeydown="onVendorSearchKey(event)" autocomplete="off" />
+            <div id="vendorSearchDropdown" class="search-dropdown"></div>
+          </div>
         </div>
         <div class="form-group" style="flex:1">
           <label>Lagerort</label>
@@ -223,6 +225,10 @@ let filteredItems = [];
 let selectedItem  = null;
 let basket        = [];
 let highlightIdx  = -1;
+let allVendors      = [];
+let filteredVendors = [];
+let selectedVendor  = null;
+let vendorHighlightIdx = -1;
 
 function setLoadStatus(text, isError = false) {
   const el = document.getElementById('loadStatus');
@@ -282,15 +288,7 @@ async function initApp() {
 async function loadVendors() {
   try {
     const data = await workerGet(`/employees`);
-    const sel = document.getElementById('vendorSelect');
-
-    sel.innerHTML = '<option value="">— Mitarbeiter auswählen —</option>';
-    (data.value || []).forEach(v => {
-      const opt = document.createElement('option');
-      opt.value       = v.no;
-      opt.textContent = `${v.no} · ${v.name}`;
-      sel.appendChild(opt);
-    });
+    allVendors = data.value || [];
   } catch (e) {
     showToast('Mitarbeiter konnten nicht geladen werden: ' + e.message, 'error');
   }
@@ -307,6 +305,11 @@ async function loadLocations() {
       opt.textContent = `${l.code}${l.name ? ' · ' + l.name : ''}`;
       sel.appendChild(opt);
     });
+    // Standard-Lagerort UG1 vorbelegen, falls vorhanden. Der Mitarbeiter
+    // kann den Wert weiterhin frei über das Dropdown ändern.
+    if ([...sel.options].some(o => o.value === 'UG1')) {
+      sel.value = 'UG1';
+    }
   } catch (e) {
     showToast('Lagerorte konnten nicht geladen werden: ' + e.message, 'error');
   }
@@ -385,6 +388,8 @@ function selectItem(idx) {
 document.addEventListener('click', e => {
   if (!document.getElementById('searchWrapper').contains(e.target))
     document.getElementById('searchDropdown').classList.remove('open');
+  if (!document.getElementById('vendorSearchWrapper').contains(e.target))
+    document.getElementById('vendorSearchDropdown').classList.remove('open');
 });
 
 // ── Basket ────────────────────────────────────────
@@ -443,7 +448,7 @@ function renderBasket() {
     return;
   }
 
-  btn.disabled = !document.getElementById('vendorSelect').value;
+  btn.disabled = !selectedVendor;
 
   el.innerHTML = `
     <table class="basket-table">
@@ -475,24 +480,77 @@ function renderBasket() {
     </table>`;
 }
 
-function onVendorChange() {
+function onVendorSearch() {
+  const q = document.getElementById('vendorSearchInput').value.trim().toLowerCase();
+  const dd = document.getElementById('vendorSearchDropdown');
+  selectedVendor = null;
+  vendorHighlightIdx = -1;
   renderBasket();
-  const vendorNo = document.getElementById('vendorSelect').value;
-  if (vendorNo) {
-    loadMyRequests();
-  } else {
-    showNoVendorSelectedHint();
+  showNoVendorSelectedHint();
+
+  if (q.length < 1) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+
+  filteredVendors = allVendors.filter(v =>
+    v.no.toLowerCase().includes(q) ||
+    (v.name || '').toLowerCase().includes(q)
+  ).slice(0, 40);
+
+  if (filteredVendors.length === 0) {
+    dd.innerHTML = '<div class="search-item" style="color:var(--gray-3)">Keine Mitarbeiter gefunden</div>';
+    dd.classList.add('open');
+    return;
+  }
+
+  dd.innerHTML = filteredVendors.map((v, idx) =>
+    `<div class="search-item" data-idx="${idx}"
+          onmousedown="selectVendor(${idx})">
+       <span class="item-no">${esc(v.no)}</span>${esc(v.name || '')}
+     </div>`
+  ).join('');
+  dd.classList.add('open');
+}
+
+function onVendorSearchKey(e) {
+  const dd = document.getElementById('vendorSearchDropdown');
+  const items = dd.querySelectorAll('.search-item[data-idx]');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    vendorHighlightIdx = Math.min(vendorHighlightIdx + 1, items.length - 1);
+    refreshVendorHighlight(items);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    vendorHighlightIdx = Math.max(vendorHighlightIdx - 1, 0);
+    refreshVendorHighlight(items);
+  } else if (e.key === 'Enter') {
+    if (vendorHighlightIdx >= 0) selectVendor(vendorHighlightIdx);
+  } else if (e.key === 'Escape') {
+    dd.classList.remove('open');
   }
 }
 
+function refreshVendorHighlight(items) {
+  items.forEach((el, i) => el.classList.toggle('highlighted', i === vendorHighlightIdx));
+  if (vendorHighlightIdx >= 0) items[vendorHighlightIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function selectVendor(idx) {
+  selectedVendor = filteredVendors[idx];
+  document.getElementById('vendorSearchInput').value =
+    `${selectedVendor.no} · ${selectedVendor.name || ''}`;
+  document.getElementById('vendorSearchDropdown').classList.remove('open');
+  renderBasket();
+  loadMyRequests();
+}
+
 function showNoVendorSelectedHint() {
+  if (selectedVendor) return;
   const el = document.getElementById('myRequestsContainer');
   el.innerHTML = '<p class="empty-basket">Bitte zuerst einen Mitarbeiter auswählen, um die zugehörigen Anfragen anzuzeigen.</p>';
 }
 
 // ── Submit ────────────────────────────────────────
 async function submitRequest() {
-  const vendorNo = document.getElementById('vendorSelect').value;
+  const vendorNo = selectedVendor ? selectedVendor.no : '';
   const remark   = document.getElementById('remarkInput').value.trim();
 
   if (!vendorNo) { showToast('Bitte einen Mitarbeiter auswählen.', 'error'); return; }
@@ -529,7 +587,7 @@ async function submitRequest() {
 
 // ── My Requests ───────────────────────────────────
 async function loadMyRequests() {
-  const vendorNo = document.getElementById('vendorSelect').value;
+  const vendorNo = selectedVendor ? selectedVendor.no : '';
   if (!vendorNo) {
     showNoVendorSelectedHint();
     return;
